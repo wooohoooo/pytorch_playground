@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import numpy as np
-       
+import seaborn as sns
+
 N = 100
 min_x, max_x = -3, 1
     
@@ -26,7 +27,7 @@ def ensemble_uncertainity_estimate(X, ensemble, iters, l2=0.005, range_fn=trange
 
 
 
-def plot_model(model, iters=200, l2=0.005, n_std=3, ax=None, uncertainty_function=uncertainity_estimate):
+def plot_model(model,X_true,y_true,X_obs,y_obs, iters=200, l2=0.005, n_std=3, ax=None, uncertainty_function=uncertainity_estimate):
     if ax is None:
         plt.close("all")
         plt.clf()
