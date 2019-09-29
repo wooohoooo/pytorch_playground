@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 
 import numpy as np
-
+from src.base_animators import AnimatepEnsemble
 
 class SimpleModel(torch.nn.Module):
     def __init__(self, p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU):
@@ -26,8 +26,9 @@ class SimpleModel(torch.nn.Module):
         return self.f(X)
     
     
-class VanillaEnsemble(object):
-    def __init__(self, p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None):
+class VanillaEnsemble(AnimatepEnsemble):
+    def __init__(self, X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None):
+        super(VanillaEnsemble,self).__init__(X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None)
         self.models = [SimpleModel(p,decay,non_linearity) for model in range(n_models)]
         self.optimizers = [torch.optim.Adam(
             model.parameters(),
@@ -62,8 +63,8 @@ class VanillaEnsemble(object):
 
 
 class BootstrapEnsemble(VanillaEnsemble):
-    def __init__(self, p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None, dataset_lenght=None,bootstrap_p_positive=0.7):
-        super(BootstrapEnsemble, self).__init__( p=0.05, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None)
+    def __init__(self,X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None,bootstrap_p_positive=0.7):
+        super(BootstrapEnsemble, self).__init__( X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None)
         
         self.dataset_lenght = dataset_lenght
         self.bootstrap_dataset_indices = [np.random.choice(a=[True, False], size=dataset_lenght, p=[bootstrap_p_positive, 1-bootstrap_p_positive]) for model in self.models]

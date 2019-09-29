@@ -16,23 +16,14 @@ def uncertainity_estimate(X, model, iters, l2=0.005, range_fn=trange):
     y_std = np.sqrt(y_variance) + (1/tau)
     return y_mean, y_std
 
-def ensemble_uncertainity_estimate(X, ensemble, iters, l2=0.005, range_fn=trange):
-    outputs = np.hstack([model(X[:, np.newaxis]).data.numpy() for model in ensemble.models])
-    y_mean = outputs.mean(axis=1)
-    y_variance = outputs.var(axis=1)
-    tau = l2 * (1-ensemble.dropout_p) / (2*N*ensemble.decay)
-    y_variance += (1/tau)
-    y_std = np.sqrt(y_variance)# + (1/tau)
-    return y_mean, y_std
 
 
-
-def plot_model(model,X_true,y_true,X_obs,y_obs, iters=200, l2=0.005, n_std=3, ax=None, uncertainty_function=uncertainity_estimate):
+def plot_model(model,X_true,y_true,X_obs,y_obs, iters=200, l2=0.005, n_std=3, ax=None):
     if ax is None:
         plt.close("all")
         plt.clf()
         fig, ax = plt.subplots(1,1)
-    y_mean, y_std = uncertainty_function(X_true, model, iters, l2=l2)
+    y_mean, y_std = model.uncertainty_function(X_true, iters, l2=l2)
     
     ax.plot(X_obs, y_obs, ls="none", marker="o", color="0.1", alpha=0.5, label="observed")
     ax.plot(X_true, y_true, ls="-", color="r", label="true")
