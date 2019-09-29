@@ -1,11 +1,20 @@
 import torch
 from torch.autograd import Variable
+from tqdm import tqdm, trange
 
 import numpy as np
 from src.base_animators import AnimatepEnsemble
 
+
+
+N = 100
+min_x, max_x = -3, 1
+    
+
+
 class SimpleModel(torch.nn.Module):
-    def __init__(self, p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU):
+    def __init__(self,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU):
+    #def __init__(self, X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght =None):
         super(SimpleModel, self).__init__()
         self.dropout_p = p
         self.decay = decay
@@ -21,9 +30,45 @@ class SimpleModel(torch.nn.Module):
             torch.nn.Dropout(p=self.dropout_p),
             torch.nn.Linear(10,1)
         )
+        
+        self.optimizer = torch.optim.Adam(
+            self.parameters(),
+            weight_decay=self.decay) 
+        
     def forward(self, X):
         X = Variable(torch.Tensor(X), requires_grad=False)
         return self.f(X)
+    
+    def ensemble_uncertainity_estimate(self,X, iters, l2=0.005, range_fn=trange):
+        outputs = np.hstack([self(X[:, np.newaxis]).data.numpy() for i in range_fn(iters)])
+        y_mean = outputs.mean(axis=1)
+        y_variance = outputs.var(axis=1)
+        tau = l2 * (1-self.dropout_p) / (2*N*self.decay)
+        y_variance += (1/tau)
+        y_std = np.sqrt(y_variance) #+ (1/tau)
+        return y_mean, y_std
+
+    
+    def uncertainty_function(self,X, iters, l2, range_fn=trange):
+        return self.ensemble_uncertainity_estimate(X=X, iters=iters, l2=l2, range_fn=trange)
+    
+    
+    
+    def fit_ensemble(self, X_abs, y_abs):
+        losslist = []
+        for model,optimizer in zip(self.models,self.optimizers):
+                        
+            losslist.append(self.fit_model(model, optimizer, X_abs,y_abs))
+    
+    
+    def fit_model(self, optimizer, X_obs,y_obs):
+        y = Variable(torch.Tensor(y_obs[:, np.newaxis]), requires_grad=False)
+        y_pred = self(X_obs[:, np.newaxis])
+        self.optimizer.zero_grad()
+        loss = self.criterion(y_pred, y)
+        loss.backward()
+        self.optimizer.step()
+        return loss
     
     
 class VanillaEnsemble(AnimatepEnsemble):
@@ -36,7 +81,21 @@ class VanillaEnsemble(AnimatepEnsemble):
         self.criterion = torch.nn.MSELoss()
         self.dropout_p = p
         self.decay = decay
-        
+    
+
+    def ensemble_uncertainity_estimate(self,X, iters, l2=0.005, range_fn=trange):
+        outputs = np.hstack([model(X[:, np.newaxis]).data.numpy() for model in self.models])
+        y_mean = outputs.mean(axis=1)
+        y_variance = outputs.var(axis=1)
+        tau = l2 * (1-self.dropout_p) / (2*N*self.decay)
+        y_variance += (1/tau)
+        y_std = np.sqrt(y_variance)# + (1/tau)
+        return y_mean, y_std
+    
+    
+    def uncertainty_function(self,X, iters, l2, range_fn=trange):
+        return self.ensemble_uncertainity_estimate(X=X, iters=iters, l2=l2, range_fn=trange)
+    
     def fit_model(self, model, optimizer, X_obs,y_obs):
         y = Variable(torch.Tensor(y_obs[:, np.newaxis]), requires_grad=False)
         y_pred = model(X_obs[:, np.newaxis])
@@ -55,12 +114,30 @@ class VanillaEnsemble(AnimatepEnsemble):
     def fit_ensemble(self, X_abs, y_abs):
         losslist = []
         for model,optimizer in zip(self.models,self.optimizers):
+                        
+            losslist.append(self.fit_model(model, optimizer, X_abs,y_abs))
+            
+        return losslist
+
+class ShuffleEnsemble(VanillaEnsemble):
+    def __init__(self,X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None,bootstrap_p_positive=0.7):
+        super(BootstrapEnsemble, self).__init__( X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None)
+        
+        self.dataset_lenght = dataset_lenght
+        self.bootstrap_dataset_indices = [np.random.choice(a=[True, False], size=dataset_lenght, p=[bootstrap_p_positive, 1-bootstrap_p_positive]) for model in self.models]
+
+
+    def fit_ensemble(self, X_abs, y_abs):
+        losslist = []
+        for model,optimizer in zip(self.models,self.optimizers):
             
             shuffled_X, shuffled_y = self.shuffle(X_abs,y_abs)
             
             losslist.append(self.fit_model(model, optimizer, shuffled_X, shuffled_y))
         return losslist
-
+    
+    
+        
 
 class BootstrapEnsemble(VanillaEnsemble):
     def __init__(self,X_obs,y_obs,X_true,y_true,p=0.00, decay=0.001, non_linearity=torch.nn.LeakyReLU, n_models=10, model_list=None,u_iters=100, l2=1, n_std=4, title="",dataset_lenght=None,bootstrap_p_positive=0.7):

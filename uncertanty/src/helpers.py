@@ -7,14 +7,7 @@ N = 100
 min_x, max_x = -3, 1
     
     
-def uncertainity_estimate(X, model, iters, l2=0.005, range_fn=trange):
-    outputs = np.hstack([model(X[:, np.newaxis]).data.numpy() for i in range_fn(iters)])
-    y_mean = outputs.mean(axis=1)
-    y_variance = outputs.var(axis=1)
-    tau = l2 * (1-model.dropout_p) / (2*N*model.decay)
-    y_variance += (1/tau)
-    y_std = np.sqrt(y_variance) + (1/tau)
-    return y_mean, y_std
+
 
 
 

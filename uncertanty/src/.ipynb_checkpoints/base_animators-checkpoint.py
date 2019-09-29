@@ -61,18 +61,6 @@ class AnimatepEnsemble(object):
         self.ax0.legend(loc="upper left")
         
 
-    def ensemble_uncertainity_estimate(self,X, iters, l2=0.005, range_fn=trange):
-        outputs = np.hstack([model(X[:, np.newaxis]).data.numpy() for model in self.models])
-        y_mean = outputs.mean(axis=1)
-        y_variance = outputs.var(axis=1)
-        tau = l2 * (1-self.dropout_p) / (2*N*self.decay)
-        y_variance += (1/tau)
-        y_std = np.sqrt(y_variance)# + (1/tau)
-        return y_mean, y_std
-    
-    
-    def uncertainty_function(self,X, iters, l2, range_fn=trange):
-        return self.ensemble_uncertainity_estimate(X=X, iters=iters, l2=l2, range_fn=trange)
 
     def init_plot(self):
         self.ln_mean.set_data([], [])
